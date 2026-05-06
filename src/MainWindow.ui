@@ -6,30 +6,117 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>500</height>
+    <width>520</width>
+    <height>680</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>屏幕录制器</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">
+QMainWindow {
+    background-color: #f8f9fa;
+}
+QGroupBox {
+    font-weight: bold;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    margin-top: 12px;
+    padding-top: 10px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 12px;
+    padding: 0 8px;
+    color: #495057;
+}
+QPushButton {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    min-height: 40px;
+}
+QPushButton:hover {
+    opacity: 0.9;
+}
+QPushButton:pressed {
+    opacity: 0.8;
+}
+QPushButton:disabled {
+    background-color: #adb5bd;
+    color: #6c757d;
+}
+QComboBox, QLineEdit {
+    padding: 8px 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    background-color: white;
+    font-size: 13px;
+}
+QComboBox:hover, QLineEdit:hover {
+    border-color: #adb5bd;
+}
+QComboBox:focus, QLineEdit:focus {
+    border-color: #228be6;
+}
+QRadioButton, QCheckBox {
+    font-size: 13px;
+    spacing: 8px;
+}
+QProgressBar {
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    text-align: center;
+    height: 20px;
+    background-color: #f1f3f5;
+}
+QProgressBar::chunk {
+    background-color: #40c057;
+    border-radius: 4px;
+}
+</string>
+  </property>
   <widget class="QWidget" name="centralWidget">
-   <layout class="QVBoxLayout" name="verticalLayout">
+   <layout class="QVBoxLayout" name="mainLayout">
+    <property name="spacing">
+     <number>12</number>
+    </property>
+    <property name="leftMargin">
+     <number>20</number>
+    </property>
+    <property name="topMargin">
+     <number>20</number>
+    </property>
+    <property name="rightMargin">
+     <number>20</number>
+    </property>
+    <property name="bottomMargin">
+     <number>20</number>
+    </property>
     <item>
-     <widget class="QGroupBox" name="groupBox">
+     <widget class="QGroupBox" name="recordModeGroup">
       <property name="title">
-       <string>录制区域</string>
+       <string>录制模式</string>
       </property>
-      <layout class="QVBoxLayout" name="verticalLayout_2">
+      <layout class="QVBoxLayout" name="recordModeLayout">
+       <property name="spacing">
+        <number>10</number>
+       </property>
        <item>
         <widget class="QRadioButton" name="fullScreenRadio">
          <property name="text">
           <string>全屏录制</string>
          </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout">
+        <layout class="QHBoxLayout" name="areaModeLayout">
          <item>
           <widget class="QRadioButton" name="areaRadio">
            <property name="text">
@@ -42,21 +129,31 @@
            <property name="text">
             <string>选择区域</string>
            </property>
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
           </widget>
          </item>
         </layout>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <layout class="QHBoxLayout" name="screenSelectLayout">
          <item>
-          <widget class="QLabel" name="label">
+          <widget class="QLabel" name="screenLabel">
            <property name="text">
-            <string>选择显示器:</string>
+            <string>选择显示器：</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QComboBox" name="screenCombo"/>
+          <widget class="QComboBox" name="screenCombo">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -64,57 +161,101 @@
      </widget>
     </item>
     <item>
-     <widget class="QGroupBox" name="groupBox_2">
+     <widget class="QGroupBox" name="settingsGroup">
       <property name="title">
        <string>录制设置</string>
       </property>
-      <layout class="QVBoxLayout" name="verticalLayout_3">
+      <layout class="QVBoxLayout" name="settingsLayout">
+       <property name="spacing">
+        <number>10</number>
+       </property>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <layout class="QHBoxLayout" name="fpsLayout">
          <item>
-          <widget class="QLabel" name="label_2">
+          <widget class="QLabel" name="fpsLabel">
            <property name="text">
-            <string>帧率:</string>
+            <string>帧率：</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QComboBox" name="fpsCombo"/>
+          <widget class="QComboBox" name="fpsCombo">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_4">
+        <layout class="QHBoxLayout" name="qualityLayout">
          <item>
-          <widget class="QLabel" name="label_3">
+          <widget class="QLabel" name="qualityLabel">
            <property name="text">
-            <string>画质:</string>
+            <string>画质：</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QComboBox" name="qualityCombo"/>
+          <widget class="QComboBox" name="qualityCombo">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
        <item>
-        <widget class="QCheckBox" name="audioCheck">
-         <property name="text">
-          <string>录制麦克风声音</string>
-         </property>
-        </widget>
+        <layout class="QHBoxLayout" name="audioLayout">
+         <item>
+          <widget class="QCheckBox" name="audioCheck">
+           <property name="text">
+            <string>录制麦克风音频</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QProgressBar" name="audioProgress">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="maximum">
+            <number>100</number>
+           </property>
+           <property name="value">
+            <number>0</number>
+           </property>
+           <property name="textVisible">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>
     </item>
     <item>
-     <widget class="QGroupBox" name="groupBox_3">
+     <widget class="QGroupBox" name="saveGroup">
       <property name="title">
        <string>保存位置</string>
       </property>
-      <layout class="QHBoxLayout" name="horizontalLayout_5">
+      <layout class="QHBoxLayout" name="saveLayout">
        <item>
-        <widget class="QLineEdit" name="outputPathEdit"/>
+        <widget class="QLineEdit" name="outputPathEdit">
+         <property name="placeholderText">
+          <string>选择视频保存位置...</string>
+         </property>
+        </widget>
        </item>
        <item>
         <widget class="QPushButton" name="browseBtn">
@@ -127,9 +268,18 @@
      </widget>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_6">
+     <layout class="QHBoxLayout" name="controlLayout">
+      <property name="spacing">
+       <number>10</number>
+      </property>
       <item>
        <widget class="QPushButton" name="startBtn">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="text">
          <string>开始录制</string>
         </property>
@@ -137,28 +287,116 @@
       </item>
       <item>
        <widget class="QPushButton" name="pauseBtn">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="text">
          <string>暂停</string>
+        </property>
+        <property name="enabled">
+         <bool>false</bool>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QPushButton" name="stopBtn">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="text">
          <string>停止</string>
+        </property>
+        <property name="enabled">
+         <bool>false</bool>
         </property>
        </widget>
       </item>
      </layout>
     </item>
     <item>
-     <widget class="QLabel" name="statusLabel">
-      <property name="text">
-       <string>准备就绪</string>
+     <widget class="QGroupBox" name="statusGroup">
+      <property name="title">
+       <string>录制状态</string>
       </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
+      <layout class="QHBoxLayout" name="statusLayout">
+       <item>
+        <widget class="QLabel" name="statusLabel1">
+         <property name="text">
+          <string>时间：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="statusTimeLabel">
+         <property name="font">
+          <font>
+           <family>Consolas</family>
+           <pointsize>14</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>00:00:00</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="statusLabel2">
+         <property name="text">
+          <string>大小：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="statusSizeLabel">
+         <property name="font">
+          <font>
+           <family>Consolas</family>
+           <pointsize>14</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>0 MB</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="statusSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="statusStateLabel">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>空闲</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </widget>
     </item>
     <item>
@@ -168,10 +406,40 @@
       </property>
      </widget>
     </item>
+    <item>
+     <spacer name="mainSpacer">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+    <item>
+     <widget class="QLabel" name="shortcutLabel">
+      <property name="font">
+       <font>
+        <pointsize>10</pointsize>
+       </font>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">color: #868e96;</string>
+      </property>
+      <property name="text">
+       <string>提示：按 Ctrl+Shift+R 可快速开始/停止录制</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
  </widget>
  <resources/>
  <connections/>
 </ui>
-

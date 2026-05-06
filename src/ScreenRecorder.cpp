@@ -2,52 +2,37 @@
 #include "Logger.h"
 #include <QGuiApplication>
 #include <QDateTime>
-#include <QBuffer>
+#include <QElapsedTimer>
 
 ScreenRecorder::ScreenRecorder(QObject* parent)
     : QObject(parent)
     , m_state(Idle)
-    , m_encoder(nullptr)
-    , m_countdownTimer(nullptr)
-    , m_captureTimer(nullptr)
-    , m_encoderThread(nullptr)
-    , m_audioInput(nullptr)
-    , m_audioDevice(nullptr)
-    , m_countdownSeconds(0)
-    , m_elapsedTime(0)
-    , m_startTime(0)
     , m_selectedScreen(nullptr)
+    , m_captureThread(nullptr)
+    , m_captureTimer(nullptr)
+    , m_startTime(0)
+    , m_screenMonitorTimer(nullptr)
+    , m_lastScreenCount(0)
 {
-    m_encoder = new FFmpegEncoder();
-    m_encoderThread = new QThread();
-    m_encoder->moveToThread(m_encoderThread);
-    m_encoderThread->start();
+    LOG_INFO("ScreenRecorder initialized");
 
-    m_countdownTimer = new QTimer(this);
-    m_countdownTimer->setInterval(1000);
-    connect(m_countdownTimer, &QTimer::timeout, this, &ScreenRecorder::onCountdownTick);
-
-    m_captureTimer = new QTimer(this);
-    connect(m_captureTimer, &QTimer::timeout, this, &ScreenRecorder::onCaptureTimer);
-
-    connect(m_encoder, &FFmpegEncoder::errorOccurred, this, &ScreenRecorder::onEncoderError);
+    // 创建屏幕监控定时器，每2秒检查一次屏幕配置变化
+    m_screenMonitorTimer = new QTimer(this);
+    m_screenMonitorTimer->setInterval(2000);
+    connect(m_screenMonitorTimer, &QTimer::timeout, this, &ScreenRecorder::onScreenConfigChanged);
 }
 
 ScreenRecorder::~ScreenRecorder()
 {
-    if (m_state != Idle) {
-        stopRecording();
+    LOG_INFO("ScreenRecorder destroying");
+    
+    // 确保停止采集
+    if (m_state.loadAcquire() != Idle) {
+        stop();
     }
-
-    if (m_encoderThread) {
-        m_encoderThread->quit();
-        m_encoderThread->wait();
-        delete m_encoderThread;
-    }
-
-    if (m_encoder) {
-        delete m_encoder;
-    }
+    
+    // 清理资源
+    cleanup();
 }
 
 QList<QScreen*> ScreenRecorder::getScreens()
@@ -55,227 +40,386 @@ QList<QScreen*> ScreenRecorder::getScreens()
     return QGuiApplication::screens();
 }
 
-void ScreenRecorder::setConfig(const RecordConfig& config)
+QScreen* ScreenRecorder::getPrimaryScreen()
 {
+    return QGuiApplication::primaryScreen();
+}
+
+void ScreenRecorder::setConfig(const CaptureConfig& config)
+{
+    // 只能在空闲状态下修改配置
+    if (m_state.loadAcquire() != Idle) {
+        LOG_WARN("Cannot change config while recording");
+        return;
+    }
+
     m_config = config;
+    LOG_INFO(QString("Capture config updated: fullScreen=%1, fps=%2, screenIndex=%3")
+             .arg(config.fullScreen)
+             .arg(config.frameRate)
+             .arg(config.screenIndex));
 }
 
-void ScreenRecorder::startCountdown(int seconds)
+ScreenRecorder::CaptureConfig ScreenRecorder::config() const
 {
-    if (m_state != Idle) {
+    return m_config;
+}
+
+bool ScreenRecorder::start()
+{
+    RecordState currentState = static_cast<RecordState>(m_state.loadAcquire());
+    if (currentState != Idle) {
+        LOG_WARN("Cannot start recording: not in idle state");
+        emit errorOccurred("Cannot start: recorder not in idle state");
+        return false;
+    }
+
+    LOG_INFO("Starting screen capture...");
+
+    // 初始化采集参数
+    if (!initializeCapture()) {
+        emit errorOccurred("Failed to initialize capture");
+        return false;
+    }
+
+    // 创建采集线程
+    m_captureThread = new QThread(this);
+    
+    // 创建采集定时器（将移动到子线程）
+    m_captureTimer = new QTimer(nullptr);  // 注意：不能设置parent，否则无法moveToThread
+    m_captureTimer->setTimerType(Qt::PreciseTimer);
+    
+    // 连接定时器信号槽
+    connect(m_captureTimer, &QTimer::timeout, this, &ScreenRecorder::onCaptureTick, Qt::DirectConnection);
+    
+    // 将定时器移动到子线程
+    m_captureTimer->moveToThread(m_captureThread);
+    
+    // 线程启动时启动定时器
+    connect(m_captureThread, &QThread::started, this, [this]() {
+        int interval = 1000 / m_config.frameRate;
+        m_captureTimer->start(interval);
+        LOG_INFO(QString("Capture timer started with interval: %1 ms").arg(interval));
+    });
+    
+    // 启动采集线程
+    m_captureThread->start();
+    
+    // 记录开始时间
+    m_startTime = QDateTime::currentMSecsSinceEpoch();
+    
+    // 启动屏幕监控
+    m_screenMonitorTimer->start();
+    
+    // 更新状态
+    setState(Recording);
+    
+    LOG_INFO("Screen capture started successfully");
+    return true;
+}
+
+void ScreenRecorder::pause()
+{
+    RecordState currentState = static_cast<RecordState>(m_state.loadAcquire());
+    if (currentState != Recording) {
+        LOG_WARN("Cannot pause: not in recording state");
         return;
     }
 
-    m_countdownSeconds = seconds;
-    m_state = CountingDown;
-    emit stateChanged(m_state);
-    emit countdownUpdated(m_countdownSeconds);
-    m_countdownTimer->start();
-
-    LOG_INFO(QString("Countdown started: %1 seconds").arg(seconds));
-}
-
-void ScreenRecorder::onCountdownTick()
-{
-    m_countdownSeconds--;
-    emit countdownUpdated(m_countdownSeconds);
-
-    if (m_countdownSeconds <= 0) {
-        m_countdownTimer->stop();
-        startRecording();
+    if (m_captureTimer && m_captureTimer->isActive()) {
+        m_captureTimer->stop();
     }
+
+    setState(Paused);
+    LOG_INFO("Screen capture paused");
 }
 
-void ScreenRecorder::startRecording()
+void ScreenRecorder::resume()
 {
-    if (m_state != Idle && m_state != CountingDown) {
+    RecordState currentState = static_cast<RecordState>(m_state.loadAcquire());
+    if (currentState != Paused) {
+        LOG_WARN("Cannot resume: not in paused state");
         return;
     }
 
-    QList<QScreen*> screens = getScreens();
+    if (m_captureTimer) {
+        int interval = 1000 / m_config.frameRate;
+        m_captureTimer->start(interval);
+    }
+
+    setState(Recording);
+    LOG_INFO("Screen capture resumed");
+}
+
+void ScreenRecorder::stop()
+{
+    RecordState currentState = static_cast<RecordState>(m_state.loadAcquire());
+    if (currentState == Idle) {
+        LOG_INFO("Already idle");
+        return;
+    }
+
+    LOG_INFO("Stopping screen capture...");
+
+    // 停止屏幕监控
+    m_screenMonitorTimer->stop();
+
+    // 停止采集定时器
+    if (m_captureTimer) {
+        m_captureTimer->stop();
+    }
+
+    // 停止采集线程
+    if (m_captureThread) {
+        m_captureThread->quit();
+        m_captureThread->wait();
+    }
+
+    // 清理资源
+    cleanup();
+
+    // 更新状态
+    setState(Idle);
+
+    LOG_INFO("Screen capture stopped");
+}
+
+ScreenRecorder::RecordState ScreenRecorder::state() const
+{
+    return static_cast<RecordState>(m_state.loadAcquire());
+}
+
+void ScreenRecorder::setFrameRate(int fps)
+{
+    if (fps <= 0) {
+        LOG_WARN(QString("Invalid frame rate: %1").arg(fps));
+        return;
+    }
+
+    // 更新配置
+    m_config.frameRate = fps;
+
+    // 如果正在录制，实时更新定时器
+    RecordState currentState = static_cast<RecordState>(m_state.loadAcquire());
+    if (currentState == Recording && m_captureTimer) {
+        int interval = 1000 / fps;
+        
+        // 使用QMetaObject::invokeMethod确保在定时器所在线程中执行
+        QMetaObject::invokeMethod(m_captureTimer, [this, interval]() {
+            m_captureTimer->setInterval(interval);
+            m_captureTimer->start();
+        }, Qt::QueuedConnection);
+        
+        LOG_INFO(QString("Frame rate changed to %1 FPS").arg(fps));
+    }
+}
+
+int ScreenRecorder::frameRate() const
+{
+    return m_config.frameRate;
+}
+
+QSharedPointer<ScreenRecorder::Frame> ScreenRecorder::getFrame()
+{
+    QMutexLocker locker(&m_queueMutex);
+    
+    if (m_frameQueue.isEmpty()) {
+        return nullptr;
+    }
+    
+    return m_frameQueue.dequeue();
+}
+
+int ScreenRecorder::queueSize() const
+{
+    QMutexLocker locker(&m_queueMutex);
+    return m_frameQueue.size();
+}
+
+void ScreenRecorder::clearQueue()
+{
+    QMutexLocker locker(&m_queueMutex);
+    m_frameQueue.clear();
+    LOG_INFO("Frame queue cleared");
+}
+
+void ScreenRecorder::onCaptureTick()
+{
+    RecordState currentState = static_cast<RecordState>(m_state.loadAcquire());
+    if (currentState != Recording) {
+        return;
+    }
+
+    // 采集一帧
+    QImage frameImage = captureFrame();
+    if (frameImage.isNull()) {
+        LOG_WARN("Failed to capture frame");
+        return;
+    }
+
+    // 计算时间戳
+    qint64 timestamp = QDateTime::currentMSecsSinceEpoch() - m_startTime;
+
+    // 创建帧对象（智能指针管理）
+    auto frame = QSharedPointer<Frame>::create(frameImage, timestamp);
+
+    // 添加到队列（线程安全）
+    {
+        QMutexLocker locker(&m_queueMutex);
+        
+        // 如果队列已满，移除最早的帧
+        if (m_frameQueue.size() >= m_config.maxQueueSize) {
+            m_frameQueue.dequeue();
+            LOG_WARN("Frame queue full, dropping oldest frame");
+        }
+        
+        m_frameQueue.enqueue(frame);
+    }
+
+    // 发送新帧可用信号
+    emit newFrameAvailable(frame);
+}
+
+void ScreenRecorder::onScreenConfigChanged()
+{
+    bool changed = false;
+    
+    // 检查显示器数量变化
+    int currentScreenCount = QGuiApplication::screens().size();
+    if (currentScreenCount != m_lastScreenCount) {
+        changed = true;
+        m_lastScreenCount = currentScreenCount;
+        LOG_INFO(QString("Screen count changed: %1 -> %2").arg(m_lastScreenCount).arg(currentScreenCount));
+    }
+    
+    // 检查选中显示器的几何变化
+    if (m_selectedScreen) {
+        QRect currentGeometry = m_selectedScreen->geometry();
+        if (currentGeometry != m_lastScreenGeometry) {
+            changed = true;
+            m_lastScreenGeometry = currentGeometry;
+            LOG_INFO(QString("Screen geometry changed: %1x%2 -> %3x%4")
+                     .arg(m_lastScreenGeometry.width()).arg(m_lastScreenGeometry.height())
+                     .arg(currentGeometry.width()).arg(currentGeometry.height()));
+            
+            // 如果是全屏录制，自动更新录制区域
+            if (m_config.fullScreen) {
+                m_config.recordRect = currentGeometry;
+                LOG_INFO("Auto-updated fullscreen record rect to new screen geometry");
+            }
+        }
+    }
+    
+    if (changed) {
+        emit screenConfigChanged();
+    }
+}
+
+bool ScreenRecorder::initializeCapture()
+{
+    // 更新选择的显示器
+    updateSelectedScreen();
+    
+    if (!m_selectedScreen) {
+        LOG_ERROR("No screen available");
+        return false;
+    }
+    
+    // 如果是全屏，自动设置录制区域
+    if (m_config.fullScreen) {
+        m_config.recordRect = m_selectedScreen->geometry();
+    }
+    
+    // 验证录制区域
+    if (m_config.recordRect.isEmpty()) {
+        LOG_ERROR("Invalid record rect: empty");
+        return false;
+    }
+    
+    // 记录初始屏幕状态
+    m_lastScreenGeometry = m_selectedScreen->geometry();
+    m_lastScreenCount = QGuiApplication::screens().size();
+    
+    LOG_INFO(QString("Capture initialized: screen=%1x%2, rect=(%3,%4,%5,%6)")
+             .arg(m_config.recordRect.width())
+             .arg(m_config.recordRect.height())
+             .arg(m_config.recordRect.x())
+             .arg(m_config.recordRect.y())
+             .arg(m_config.recordRect.width())
+             .arg(m_config.recordRect.height()));
+    
+    return true;
+}
+
+void ScreenRecorder::cleanup()
+{
+    // 清理采集定时器
+    if (m_captureTimer) {
+        m_captureTimer->deleteLater();
+        m_captureTimer = nullptr;
+    }
+    
+    // 清理采集线程
+    if (m_captureThread) {
+        m_captureThread->deleteLater();
+        m_captureThread = nullptr;
+    }
+    
+    // 清空帧队列
+    clearQueue();
+    
+    m_selectedScreen = nullptr;
+}
+
+QImage ScreenRecorder::captureFrame()
+{
+    if (!m_selectedScreen) {
+        return QImage();
+    }
+    
+    // 计算相对于显示器的采集区域
+    QRect screenGeometry = m_selectedScreen->geometry();
+    QRect captureRect(
+        m_config.recordRect.x() - screenGeometry.x(),
+        m_config.recordRect.y() - screenGeometry.y(),
+        m_config.recordRect.width(),
+        m_config.recordRect.height()
+    );
+    
+    // 捕获屏幕
+    return m_selectedScreen->grabWindow(0, captureRect.x(), captureRect.y(),
+                                      captureRect.width(), captureRect.height()).toImage();
+}
+
+void ScreenRecorder::updateSelectedScreen()
+{
+    QList<QScreen*> screens = QGuiApplication::screens();
+    
     if (m_config.screenIndex >= 0 && m_config.screenIndex < screens.size()) {
         m_selectedScreen = screens[m_config.screenIndex];
     } else {
         m_selectedScreen = QGuiApplication::primaryScreen();
     }
-
-    if (m_config.fullScreen) {
-        m_config.recordRect = m_selectedScreen->geometry();
-    }
-
-    initEncoder();
-
-    m_state = Recording;
-    m_startTime = QDateTime::currentMSecsSinceEpoch();
-    m_elapsedTime = 0;
-    emit stateChanged(m_state);
-
-    startCapture();
-
-    LOG_INFO("Recording started");
-}
-
-void ScreenRecorder::initEncoder()
-{
-    FFmpegEncoder::EncoderConfig encoderConfig;
-    encoderConfig.outputPath = m_config.outputPath;
-    encoderConfig.width = m_config.recordRect.width();
-    encoderConfig.height = m_config.recordRect.height();
-    encoderConfig.frameRate = m_config.frameRate;
-    encoderConfig.bitrate = getBitrate(m_config.quality);
-    encoderConfig.recordAudio = m_config.recordAudio;
-    encoderConfig.audioSampleRate = 44100;
-    encoderConfig.audioChannels = 2;
-
-    m_encoder->init(encoderConfig);
-}
-
-int ScreenRecorder::getBitrate(int quality) const
-{
-    int width = m_config.recordRect.width();
-    int height = m_config.recordRect.height();
-    int baseBitrate = width * height * m_config.frameRate / 100;
-
-    switch (quality) {
-        case 0: return baseBitrate * 0.5;
-        case 1: return baseBitrate;
-        case 2: return baseBitrate * 2;
-        default: return baseBitrate;
+    
+    if (m_selectedScreen) {
+        LOG_INFO(QString("Selected screen: index=%1, geometry=%2x%3")
+                 .arg(m_config.screenIndex)
+                 .arg(m_selectedScreen->geometry().width())
+                 .arg(m_selectedScreen->geometry().height()));
     }
 }
 
-void ScreenRecorder::startCapture()
+void ScreenRecorder::setState(RecordState newState)
 {
-    int interval = 1000 / m_config.frameRate;
-    m_captureTimer->start(interval);
-
-    if (m_config.recordAudio) {
-        QAudioFormat format;
-        format.setSampleRate(44100);
-        format.setChannelCount(2);
-        format.setSampleSize(16);
-        format.setCodec("audio/pcm");
-        format.setByteOrder(QAudioFormat::LittleEndian);
-        format.setSampleType(QAudioFormat::SignedInt);
-
-        QAudioDeviceInfo info = QAudioDeviceInfo::defaultInputDevice();
-        if (!info.isFormatSupported(format)) {
-            format = info.nearestFormat(format);
-        }
-
-        m_audioInput = new QAudioInput(format, this);
-        m_audioDevice = m_audioInput->start();
-        connect(m_audioDevice, &QIODevice::readyRead, this, &ScreenRecorder::onAudioReadyRead);
-    }
-}
-
-void ScreenRecorder::stopCapture()
-{
-    m_captureTimer->stop();
-
-    if (m_audioInput) {
-        m_audioInput->stop();
-        delete m_audioInput;
-        m_audioInput = nullptr;
-    }
-}
-
-void ScreenRecorder::pauseRecording()
-{
-    if (m_state != Recording) {
+    RecordState oldState = static_cast<RecordState>(m_state.loadAcquire());
+    if (oldState == newState) {
         return;
     }
-
-    m_state = Paused;
-    stopCapture();
-    emit stateChanged(m_state);
-
-    LOG_INFO("Recording paused");
+    
+    m_state.storeRelease(newState);
+    emit stateChanged(newState);
+    
+    LOG_INFO(QString("State changed: %1 -> %2")
+             .arg(oldState == Idle ? "Idle" : oldState == Recording ? "Recording" : "Paused")
+             .arg(newState == Idle ? "Idle" : newState == Recording ? "Recording" : "Paused"));
 }
-
-void ScreenRecorder::resumeRecording()
-{
-    if (m_state != Paused) {
-        return;
-    }
-
-    m_state = Recording;
-    m_startTime = QDateTime::currentMSecsSinceEpoch() - m_elapsedTime;
-    startCapture();
-    emit stateChanged(m_state);
-
-    LOG_INFO("Recording resumed");
-}
-
-void ScreenRecorder::stopRecording()
-{
-    if (m_state == Idle || m_state == Stopping) {
-        return;
-    }
-
-    m_state = Stopping;
-    emit stateChanged(m_state);
-
-    stopCapture();
-
-    if (m_encoder->isInitialized()) {
-        m_encoder->finish();
-    }
-
-    m_state = Idle;
-    emit stateChanged(m_state);
-    emit recordingFinished(m_config.outputPath);
-
-    LOG_INFO("Recording stopped");
-}
-
-void ScreenRecorder::onCaptureTimer()
-{
-    if (m_state != Recording) {
-        return;
-    }
-
-    m_elapsedTime = QDateTime::currentMSecsSinceEpoch() - m_startTime;
-    emit elapsedTimeUpdated(m_elapsedTime);
-
-    QImage frame = captureScreen();
-    if (!frame.isNull()) {
-        m_encoder->encodeVideoFrame(frame, m_elapsedTime);
-    }
-}
-
-QImage ScreenRecorder::captureScreen()
-{
-    if (!m_selectedScreen) {
-        return QImage();
-    }
-
-    QRect rect = m_config.recordRect;
-    QPoint screenTopLeft = m_selectedScreen->geometry().topLeft();
-    QRect captureRect(
-        rect.left() - screenTopLeft.x(),
-        rect.top() - screenTopLeft.y(),
-        rect.width(),
-        rect.height()
-    );
-
-    return m_selectedScreen->grabWindow(0, captureRect.x(), captureRect.y(),
-                                        captureRect.width(), captureRect.height()).toImage();
-}
-
-void ScreenRecorder::onAudioReadyRead()
-{
-    if (m_state != Recording || !m_audioDevice) {
-        return;
-    }
-
-    QByteArray data = m_audioDevice->readAll();
-    m_encoder->encodeAudioFrame(data, m_elapsedTime);
-}
-
-void ScreenRecorder::onEncoderError(const QString& error)
-{
-    LOG_ERROR(QString("Encoder error: %1").arg(error));
-    emit errorOccurred(error);
-}
-
