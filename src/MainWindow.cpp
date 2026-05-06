@@ -42,15 +42,31 @@ MainWindow::MainWindow(QWidget* parent)
     , m_elapsedTimer(nullptr)
     , m_recordStartTime(0)
 {
+    LOG_INFO("MainWindow constructor started...");
+    
     ui->setupUi(this);
-
+    
+    LOG_INFO("UI setup completed");
+    
     m_recorder = new ScreenRecorder(this);
-
+    
+    LOG_INFO("ScreenRecorder created");
+    
     initUI();
     initTrayIcon();
     initShortcuts();
     initAudioMonitor();
     loadSettings();
+    
+    // 确保窗口居中显示
+    QScreen* screen = QGuiApplication::primaryScreen();
+    if (screen) {
+        QRect screenGeometry = screen->geometry();
+        int x = (screenGeometry.width() - width()) / 2;
+        int y = (screenGeometry.height() - height()) / 2;
+        move(x, y);
+        LOG_INFO(QString("Window moved to (%1, %2)").arg(x).arg(y));
+    }
 
     // 连接信号槽 - 使用队列连接确保跨线程安全
     connect(m_recorder, &ScreenRecorder::stateChanged, this, &MainWindow::onStateChanged, Qt::QueuedConnection);
@@ -58,7 +74,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_recorder, &ScreenRecorder::screenConfigChanged, this, &MainWindow::onScreenConfigChanged, Qt::QueuedConnection);
     connect(m_recorder, &ScreenRecorder::errorOccurred, this, &MainWindow::onRecorderError, Qt::QueuedConnection);
 
-    LOG_INFO("Application started");
+    LOG_INFO("Application started - window should be visible now!");
 }
 
 MainWindow::~MainWindow()
@@ -84,10 +100,6 @@ void MainWindow::initUI()
     setWindowTitle("屏幕录制器");
     setMinimumSize(480, 620);
     setMaximumSize(600, 700);
-    
-    // 启用高DPI支持
-    setAttribute(Qt::AA_EnableHighDpiScaling);
-    setAttribute(Qt::AA_UseHighDpiPixmaps);
 
     // 初始化录制模式
     ui->fullScreenRadio->setChecked(true);
@@ -406,7 +418,7 @@ void MainWindow::onStateChanged(ScreenRecorder::RecordState state)
 void MainWindow::onNewFrameAvailable(QSharedPointer<ScreenRecorder::Frame> frame)
 {
     // 这里可以做帧预览或统计
-    m_fileSize += frame->image.byteCount();
+    m_fileSize += frame->image.sizeInBytes();
     updateStatusBar();
 }
 

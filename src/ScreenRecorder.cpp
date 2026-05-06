@@ -3,6 +3,7 @@
 #include <QGuiApplication>
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QPixmap>
 
 ScreenRecorder::ScreenRecorder(QObject* parent)
     : QObject(parent)

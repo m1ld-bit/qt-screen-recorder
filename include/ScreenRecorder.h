@@ -11,6 +11,7 @@
 #include <QSharedPointer>
 #include <QAtomicInt>
 #include <QTimer>
+#include <QImage>
 
 /**
  * @brief ScreenRecorder 类 - 专注于屏幕采集
