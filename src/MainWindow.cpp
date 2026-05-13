@@ -23,6 +23,7 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_recorder(nullptr)
+    , m_encoder(nullptr)
     , m_trayIcon(nullptr)
     , m_trayMenu(nullptr)
     , m_trayStartAction(nullptr)
@@ -50,7 +51,12 @@ MainWindow::MainWindow(QWidget* parent)
     
     m_recorder = new ScreenRecorder(this);
     
-    LOG_INFO("ScreenRecorder created");
+#ifdef ENABLE_FFMPEG
+    m_encoder = new FFmpegEncoder(this);
+    LOG_INFO("ScreenRecorder and FFmpegEncoder created");
+#else
+    LOG_INFO("ScreenRecorder created (FFmpeg disabled)");
+#endif
     
     initUI();
     initTrayIcon();
@@ -73,6 +79,12 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_recorder, &ScreenRecorder::newFrameAvailable, this, &MainWindow::onNewFrameAvailable, Qt::QueuedConnection);
     connect(m_recorder, &ScreenRecorder::screenConfigChanged, this, &MainWindow::onScreenConfigChanged, Qt::QueuedConnection);
     connect(m_recorder, &ScreenRecorder::errorOccurred, this, &MainWindow::onRecorderError, Qt::QueuedConnection);
+    
+#ifdef ENABLE_FFMPEG
+    // 连接编码器信号
+    connect(m_encoder, &FFmpegEncoder::errorOccurred, this, &MainWindow::onEncoderError, Qt::QueuedConnection);
+    connect(m_encoder, &FFmpegEncoder::encodingProgress, this, &MainWindow::onEncodingProgress, Qt::QueuedConnection);
+#endif
 
     LOG_INFO("Application started - window should be visible now!");
 }
@@ -210,6 +222,43 @@ void MainWindow::onStartClicked()
     // 生成输出文件路径
     m_currentFilePath = ui->outputPathEdit->text() + "/" + generateFileName();
 
+#ifdef ENABLE_FFMPEG
+    // 初始化编码器
+    FFmpegEncoder::EncoderConfig encoderConfig;
+    encoderConfig.outputPath = m_currentFilePath;
+    encoderConfig.width = m_recorder->config().recordRect.width();
+    encoderConfig.height = m_recorder->config().recordRect.height();
+    encoderConfig.frameRate = m_recorder->config().frameRate;
+    
+    int qualityIndex = ui->qualityCombo->currentData().toInt();
+    switch (qualityIndex) {
+        case 0: encoderConfig.quality = FFmpegEncoder::QualityLow; break;
+        case 1: encoderConfig.quality = FFmpegEncoder::QualityMedium; break;
+        case 2: encoderConfig.quality = FFmpegEncoder::QualityHigh; break;
+        default: encoderConfig.quality = FFmpegEncoder::QualityMedium; break;
+    }
+    
+    encoderConfig.recordAudio = ui->audioCheck->isChecked();
+    encoderConfig.audioSampleRate = 44100;
+    encoderConfig.audioChannels = 2;
+
+    if (encoderConfig.width <= 0 || encoderConfig.height <= 0) {
+        QScreen* screen = QGuiApplication::primaryScreen();
+        if (screen) {
+            encoderConfig.width = screen->geometry().width();
+            encoderConfig.height = screen->geometry().height();
+        }
+    }
+
+    // 初始化编码器
+    if (!m_encoder->init(encoderConfig)) {
+        QMessageBox::critical(this, "错误", "初始化编码器失败！");
+        return;
+    }
+#else
+    LOG_INFO("FFmpeg disabled, recording will not be saved to file");
+#endif
+
     // 开始采集
     if (m_recorder->start()) {
         m_recordStartTime = QDateTime::currentMSecsSinceEpoch();
@@ -241,9 +290,18 @@ void MainWindow::onStopClicked()
     m_elapsedTimer->stop();
     hideFloatingIndicator();
     
-    // 这里应该触发编码保存（当前ScreenRecorder只负责采集）
+#ifdef ENABLE_FFMPEG
+    // 完成编码
+    if (m_encoder->isInitialized()) {
+        m_encoder->finish();
+    }
+    
     QMessageBox::information(this, "录制完成", 
-                           QString("录制已完成！\n\n帧队列中有 %1 帧等待处理。").arg(m_recorder->queueSize()));
+                           QString("录制已完成！\n\n视频文件已保存至：\n%1").arg(m_currentFilePath));
+#else
+    QMessageBox::information(this, "录制完成", 
+                           QString("录制已完成！\n\n帧队列中有 %1 帧。\n\n提示：要保存视频，请配置 FFmpeg 并在 .pro 文件中启用 ENABLE_FFMPEG。").arg(m_recorder->queueSize()));
+#endif
 }
 
 void MainWindow::onFullScreenToggled(bool checked)
@@ -420,6 +478,13 @@ void MainWindow::onNewFrameAvailable(QSharedPointer<ScreenRecorder::Frame> frame
     // 这里可以做帧预览或统计
     m_fileSize += frame->image.sizeInBytes();
     updateStatusBar();
+    
+#ifdef ENABLE_FFMPEG
+    // 将帧发送给编码器
+    if (m_encoder->isInitialized()) {
+        m_encoder->addVideoFrame(frame->image, frame->timestamp);
+    }
+#endif
 }
 
 void MainWindow::onScreenConfigChanged()
@@ -433,6 +498,19 @@ void MainWindow::onRecorderError(const QString& error)
 {
     QMessageBox::critical(this, "录制错误", error);
 }
+
+#ifdef ENABLE_FFMPEG
+void MainWindow::onEncoderError(const QString& error)
+{
+    LOG_ERROR(QString("Encoder error: %1").arg(error));
+    QMessageBox::critical(this, "编码错误", error);
+}
+
+void MainWindow::onEncodingProgress(qint64 videoFrames, qint64 audioFrames)
+{
+    LOG_INFO(QString("Encoding progress: %1 video frames, %2 audio frames").arg(videoFrames).arg(audioFrames));
+}
+#endif
 
 void MainWindow::updateElapsedTime()
 {

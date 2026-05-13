@@ -1,202 +1,221 @@
 # 屏幕录制器 (Screen Recorder)
 
-一个基于Qt和FFmpeg的Windows屏幕录制桌面应用程序。
+一个基于 Qt5 和 FFmpeg 的 Windows 屏幕录制桌面应用程序。
 
 ## 功能特性
 
-- 全屏录制和选区录制
-- 开始/暂停/停止录制控制
-- 可选录制麦克风音频
-- 支持多种帧率(15/30/60 FPS)
-- 可调节画质(低/中/高)
-- 录制时显示悬浮时间指示器
-- 系统托盘支持
-- 快捷键支持(Ctrl+Shift+R)
-- 多显示器支持
-- 自动日志记录
+- ✅ 全屏录制
+- ⏳ 区域录制（UI已支持，选择功能待完善）
+- ✅ 开始/暂停/停止录制
+- ✅ 音频录制（麦克风输入）
+- ✅ 帧率选择（15/30/60 FPS）
+- ✅ 画质设置（低/中/高）
+- ⏳ 输出 MP4 格式（H.264 + AAC）- 需要配置 FFmpeg
+- ✅ 系统托盘支持
+- ✅ 快捷键控制（Ctrl+Shift+R）
+- ✅ 实时状态显示
 
 ## 技术栈
 
-- C++17
-- Qt 5.15 (Widgets)
-- FFmpeg (H.264编码, MP4封装)
-- MSVC 2019 (x64)
-- qmake
+- **语言**：C++17
+- **框架**：Qt 5.15 (Widgets)
+- **编码**：FFmpeg 4.x
+- **编译器**：MinGW 或 MSVC 2019+
+- **构建工具**：qmake
 
 ## 项目结构
 
 ```
 ScreenRecorder/
-├── include/              # 头文件
-│   ├── Logger.h
-│   ├── FFmpegEncoder.h
-│   ├── ScreenRecorder.h
-│   └── MainWindow.h
-├── src/                  # 源文件
-│   ├── Logger.cpp
-│   ├── FFmpegEncoder.cpp
-│   ├── ScreenRecorder.cpp
-│   ├── MainWindow.cpp
-│   ├── MainWindow.ui
-│   └── main.cpp
-├── resources/            # 资源文件
-│   ├── resources.qrc
-│   └── app.rc
-├── ffmpeg/               # FFmpeg库(需自行添加)
-│   ├── include/
-│   └── lib/
-└── ScreenRecorder.pro    # 项目配置文件
+├── include/
+│   ├── MainWindow.h          # 主窗口类
+│   ├── ScreenRecorder.h      # 屏幕录制类
+│   ├── FFmpegEncoder.h       # FFmpeg编码器类
+│   └── Logger.h              # 日志类
+├── src/
+│   ├── main.cpp              # 程序入口
+│   ├── MainWindow.cpp        # 主窗口实现
+│   ├── ScreenRecorder.cpp    # 屏幕录制实现
+│   ├── FFmpegEncoder.cpp     # FFmpeg编码器实现
+│   ├── Logger.cpp            # 日志实现
+│   ├── MainWindow.ui         # UI文件
+├── resources/
+│   └── resources.qrc         # 资源文件
+├── ffmpeg/                   # FFmpeg库目录（需要自行添加）
+│   ├── include/              # FFmpeg头文件
+│   ├── lib/                  # FFmpeg库文件
+│   └── bin/                  # FFmpeg DLL文件
+└── ScreenRecorder.pro        # 项目配置文件
 ```
 
-## 编译步骤
+## 前置准备
 
-### 1. 环境准备
+### 重要：FFmpeg（可选）
 
-- 安装Visual Studio 2019 (MSVC 2019, x64)
-- 安装Qt 5.15 (MSVC 2019, x64)
-- 下载FFmpeg开发库
+本项目支持**不使用 FFmpeg 也可以运行**！
+- ✅ 可以测试屏幕录制功能
+- ⏳ 只是不会保存视频文件
 
-### 2. 配置FFmpeg
+要保存视频，需要配置 FFmpeg（详见 [FFMPEG_SETUP.md](FFMPEG_SETUP.md)）
 
-将FFmpeg开发库解压到项目根目录下的`ffmpeg`文件夹中:
+### 1. 安装 Qt5
+
+从 [Qt官网](https://www.qt.io/download) 下载并安装 Qt 5.15 或更高版本。
+
+### 2. 下载 FFmpeg
+
+从 [FFmpeg官网](https://ffmpeg.org/download.html) 或 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 下载 Windows 开发包（dev 版本）。
+
+推荐使用 `ffmpeg-git-full.7z` 或 `ffmpeg-release-full.7z`。
+
+### 3. 配置 FFmpeg 目录
+
+在项目根目录创建 `ffmpeg` 文件夹，并按以下结构放置文件：
 
 ```
-ffmpeg/
-├── include/              # FFmpeg头文件
-│   ├── libavcodec/
-│   ├── libavformat/
-│   ├── libavutil/
-│   ├── libswscale/
-│   └── libswresample/
-└── lib/                  # FFmpeg库文件
-    ├── avcodec.lib
-    ├── avformat.lib
-    ├── avutil.lib
-    ├── swscale.lib
-    └── swresample.lib
+ScreenRecorder/
+└── ffmpeg/
+    ├── include/              # 复制 dev/include 下的所有头文件
+    │   ├── libavcodec/
+    │   ├── libavformat/
+    │   ├── libavutil/
+    │   ├── libswscale/
+    │   ├── libswresample/
+    │   └── ...
+    ├── lib/                  # 复制 dev/lib 下的所有 .a 或 .lib 文件
+    │   ├── libavcodec.a
+    │   ├── libavformat.a
+    │   ├── libavutil.a
+    │   ├── libswscale.a
+    │   ├── libswresample.a
+    │   └── ...
+    └── bin/                  # 复制 shared/bin 下的所有 .dll 文件
+        ├── avcodec-58.dll
+        ├── avformat-58.dll
+        ├── avutil-56.dll
+        ├── swscale-5.dll
+        ├── swresample-3.dll
+        └── ...
 ```
 
-FFmpeg下载地址: https://github.com/BtbN/FFmpeg-Builds/releases
+## 编译和运行
 
-推荐下载: `ffmpeg-n5.1-latest-win64-gpl-shared-5.1.zip`
+### 使用 Qt Creator
 
-### 3. 使用Qt Creator编译
+1. 打开 Qt Creator
+2. `文件` → `打开文件或项目` → 选择 `ScreenRecorder.pro`
+3. 配置项目（选择编译套件）
+4. 点击绿色运行按钮
 
-1. 打开Qt Creator
-2. 文件 → 打开文件或项目 → 选择`ScreenRecorder.pro`
-3. 配置项目: 选择MSVC 2019 64bit编译器
-4. 点击构建按钮(Ctrl+B)
+### 使用命令行
 
-### 4. 使用命令行编译
-
-打开"x64 Native Tools Command Prompt for VS 2019":
-
-```cmd
+```bash
+# 1. 进入项目目录
 cd E:\project\ScreenRecorder
+
+# 2. 运行 qmake
 qmake ScreenRecorder.pro
+
+# 3. 使用 MinGW 编译
+mingw32-make
+
+# 或者使用 MSVC 编译
 nmake
+
+# 4. 运行程序
+debug\ScreenRecorder.exe  # 或者 release\ScreenRecorder.exe
 ```
-
-### 5. 运行程序
-
-将FFmpeg的DLL文件复制到可执行文件所在目录(debug或release),然后运行生成的`ScreenRecorder.exe`
-
-需要的FFmpeg DLL文件:
-- avcodec-58.dll
-- avformat-58.dll
-- avutil-56.dll
-- swscale-5.dll
-- swresample-3.dll
 
 ## 使用说明
 
-### 基本操作
+### 基本录制
 
-1. **选择录制区域**:
-   - 全屏录制: 勾选"全屏录制"
-   - 选区录制: 勾选"选区录制",点击"选择区域"按钮,在屏幕上拖动鼠标选择区域
+1. **选择录制区域**
+   - 全屏：选择"全屏录制"
+   - 区域：选择"区域录制"，点击"选择区域"
 
-2. **选择显示器**: 如有多个显示器,可从下拉菜单中选择要录制的显示器
+2. **设置帧率**
+   - 从下拉菜单选择 15/30/60 FPS
 
-3. **设置参数**:
-   - 帧率: 15/30/60 FPS
-   - 画质: 低/中/高
-   - 是否录制麦克风声音
+3. **设置画质**
+   - 低画质：较小文件，较快编码
+   - 中画质：平衡（推荐）
+   - 高画质：较大文件，较好质量
 
-4. **选择保存位置**: 设置视频保存文件夹
+4. **音频设置**
+   - 勾选"录制音频"以启用麦克风
 
-5. **开始录制**: 点击"开始录制",3秒倒计时后开始录制
+5. **设置保存路径**
+   - 默认保存到桌面
+   - 点击"浏览"可自定义路径
 
-6. **暂停/继续**: 点击"暂停"按钮暂停录制,再次点击继续
+6. **开始录制**
+   - 点击"开始录制"
+   - 或按快捷键 `Ctrl+Shift+R`
 
-7. **停止录制**: 点击"停止"按钮结束录制,视频将自动保存
+7. **控制录制**
+   - 暂停/继续：点击"暂停/继续"
+   - 停止：点击"停止录制"
 
-### 快捷键
+## FFmpeg 依赖配置
 
-- `Ctrl+Shift+R`: 开始/停止录制
+如果 FFmpeg 不在项目根目录，请修改 `ScreenRecorder.pro` 中的路径：
 
-### 系统托盘
-
-程序最小化后会驻留在系统托盘,可右键点击托盘图标进行操作。
+```qmake
+# 修改这一行
+FFMPEG_DIR = D:/path/to/your/ffmpeg
+```
 
 ## 架构说明
 
-### 分层设计
+### 模块职责
 
-1. **UI层 (MainWindow)**:
-   - 用户界面
-   - 参数配置
-   - 状态显示
-   - 系统托盘管理
+| 模块 | 职责 |
+|------|------|
+| **MainWindow** | UI 管理，用户交互，状态显示 |
+| **ScreenRecorder** | 屏幕采集，帧队列，多线程管理 |
+| **FFmpegEncoder** | H.264 视频编码，AAC 音频编码，MP4 封装 |
+| **Logger** | 日志输出（简化版使用 qDebug） |
 
-2. **录制核心层 (ScreenRecorder)**:
-   - 屏幕捕获
-   - 音频捕获
-   - 录制状态管理
-   - 多线程处理
+### 数据流
 
-3. **编码层 (FFmpegEncoder)**:
-   - 视频编码(H.264)
-   - 音频编码(AAC)
-   - MP4封装
-   - 文件写入
+```
+屏幕 → ScreenRecorder → 帧队列 → FFmpegEncoder → MP4文件
+       （采集线程）            （编码线程）
+```
 
-4. **工具类 (Logger)**:
-   - 日志记录
-   - 文件输出
+### 线程模型
 
-### 多线程设计
+- **UI 线程**：处理用户交互
+- **采集线程**：抓取屏幕帧
+- **视频编码线程**：编码视频帧
+- **音频编码线程**：编码音频帧（可选）
+- **复用线程**：写入 MP4 文件
 
-- 屏幕捕获和编码在独立线程中运行
-- UI线程不被阻塞
-- 使用Qt信号槽机制进行线程间通信
+## 注意事项
 
-## 常见问题
+1. **DLL 文件**：运行时确保 FFmpeg 的 DLL 文件在可执行文件同一目录或系统 PATH 中
 
-### 1. 编译错误: 找不到FFmpeg头文件
+2. **性能**：高帧率 + 高画质会占用较多 CPU
 
-确保FFmpeg的include文件夹已正确放置在项目目录下,并检查`ScreenRecorder.pro`中的路径配置。
+3. **音频**：当前音频采集功能需要进一步完善
 
-### 2. 运行时错误: 缺少DLL文件
+## 待完善功能
 
-将FFmpeg的DLL文件复制到可执行文件所在目录。
-
-### 3. 录制没有声音
-
-确保麦克风已正确连接并在系统中设置为默认录音设备。
-
-## 开发计划
-
-- [ ] 添加摄像头录制功能
-- [ ] 添加系统声音录制功能
-- [ ] 添加视频编辑功能
-- [ ] 添加录制计划任务
-- [ ] 支持更多视频格式
+- [ ] 屏幕区域选择（绘制选择框）
+- [ ] 音频采集和编码集成
+- [ ] 录制倒计时
+- [ ] 视频预览
+- [ ] 更多编码器选项
+- [ ] 自定义快捷键
+- [ ] 录制计划
+- [ ] 水印功能
 
 ## 许可证
 
 本项目仅供学习和研究使用。
 
-## 联系方式
+## 致谢
 
-如有问题或建议,欢迎反馈!
+- Qt Project
+- FFmpeg Team

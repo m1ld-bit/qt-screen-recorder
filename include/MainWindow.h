@@ -12,6 +12,10 @@
 #include <QTimer>
 #include "ScreenRecorder.h"
 
+#ifdef ENABLE_FFMPEG
+#include "FFmpegEncoder.h"
+#endif
+
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -64,6 +68,12 @@ private slots:
     void onScreenConfigChanged();
     void onRecorderError(const QString& error);
     
+#ifdef ENABLE_FFMPEG
+    // 编码器状态更新
+    void onEncoderError(const QString& error);
+    void onEncodingProgress(qint64 videoFrames, qint64 audioFrames);
+#endif
+    
     // 更新录制时间
     void updateElapsedTime();
 
@@ -94,6 +104,10 @@ private:
 
     Ui::MainWindow* ui;
     ScreenRecorder* m_recorder;
+    
+#ifdef ENABLE_FFMPEG
+    FFmpegEncoder* m_encoder;
+#endif
     
     // 系统托盘
     QSystemTrayIcon* m_trayIcon;
