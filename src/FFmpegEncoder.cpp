@@ -483,10 +483,7 @@ bool FFmpegEncoder::encodeAudioFrame(const AudioFrame& frame)
         return avcodec_send_frame(m_audioCodecContext, nullptr) >= 0;
     }
 
-    // Process audio data
-    const int16_t* samples = reinterpret_cast<const int16_t*>(frame.data.constData());
-    int sampleCount = frame.data.size() / (sizeof(int16_t) * m_config.audioChannels);
-
+    // Process audio data (audio encoding is simplified for now)
     int ret = avcodec_send_frame(m_audioCodecContext, m_audioFrame);
     if (ret < 0) {
         char errBuf[AV_ERROR_MAX_STRING_SIZE];

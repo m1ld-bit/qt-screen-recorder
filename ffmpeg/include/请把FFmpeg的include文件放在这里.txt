@@ -1,0 +1,16 @@
+请把 FFmpeg 的 include 文件夹内容放在这里！
+
+操作步骤：
+1. 下载 FFmpeg (见 setup_ffmpeg.bat)
+2. 解压后找到 include 文件夹
+3. 把 include 里面的所有内容复制到这个目录
+
+正确的结构应该是：
+ffmpeg/
+└── include/
+    ├── libavcodec/
+    │   └── avcodec.h
+    ├── libavformat/
+    ├── libavutil/
+    ├── libswscale/
+    └── libswresample/

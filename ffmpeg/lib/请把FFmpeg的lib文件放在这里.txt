@@ -1,0 +1,12 @@
+请把 FFmpeg 的库文件放在这里！
+
+操作步骤：
+1. 从下载的 FFmpeg 解压包中找到 lib 文件夹
+2. 把里面的所有文件复制到这里
+
+需要的文件：
+- libavcodec.dll.a 或 avcodec.lib
+- libavformat.dll.a 或 avformat.lib
+- libavutil.dll.a 或 avutil.lib
+- libswscale.dll.a 或 swscale.lib
+- libswresample.dll.a 或 swresample.lib

@@ -20,7 +20,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # DEFINES += ENABLE_FFMPEG
 
 contains(DEFINES, ENABLE_FFMPEG) {
-    message(使用FFmpeg编码器)
+    message(FFmpeg enabled)
     
     # FFmpeg 头文件路径 - 根据你的实际路径修改
     FFMPEG_DIR = $$PWD/ffmpeg
@@ -28,7 +28,7 @@ contains(DEFINES, ENABLE_FFMPEG) {
         include \
         $$FFMPEG_DIR/include
     
-    # FFmpeg 库文件 - Windows x64
+    # FFmpeg 库文件 - 使用 -L 和 -l 方式
     win32: LIBS += -L$$FFMPEG_DIR/lib \
         -lavcodec \
         -lavformat \
@@ -46,7 +46,7 @@ contains(DEFINES, ENABLE_FFMPEG) {
     SOURCES += src/FFmpegEncoder.cpp
     HEADERS += include/FFmpegEncoder.h
 } else {
-    message(FFmpeg编码器已禁用，仅录制不保存)
+    message(FFmpeg disabled - recording only)
     INCLUDEPATH += include
 }
 
@@ -66,4 +66,3 @@ FORMS += \
 
 RESOURCES += \
     resources/resources.qrc
-

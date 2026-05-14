@@ -1,0 +1,13 @@
+请把 FFmpeg 的 DLL 文件放在这里！
+
+操作步骤：
+1. 从下载的 FFmpeg 解压包中找到 bin 文件夹
+2. 把里面的所有 DLL 文件复制到这里
+3. 编译成功后，还需要把这些 DLL 复制到 exe 同级目录！
+
+需要的文件（版本号可能不同）：
+- avcodec-60.dll
+- avformat-60.dll
+- avutil-58.dll
+- swscale-7.dll
+- swresample-4.dll
