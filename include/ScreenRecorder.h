@@ -53,7 +53,7 @@ public:
             : fullScreen(true)
             , frameRate(30)
             , screenIndex(-1)
-            , maxQueueSize(30) {}
+            , maxQueueSize(10000) {}
     };
 
     /**

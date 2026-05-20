@@ -18,11 +18,13 @@
 #include <QFile>
 #include <QDebug>
 #include <QDateTime>
+#include <QProgressDialog>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_recorder(nullptr)
+    , m_areaSelector(nullptr)
     , m_trayIcon(nullptr)
     , m_trayMenu(nullptr)
     , m_trayStartAction(nullptr)
@@ -41,12 +43,13 @@ MainWindow::MainWindow(QWidget* parent)
     , m_fileSize(0)
     , m_elapsedTimer(nullptr)
     , m_recordStartTime(0)
+#ifdef ENABLE_FFMPEG
+    , m_encoder(nullptr)
+#endif
 {
     LOG_INFO("MainWindow constructor started...");
     
     ui->setupUi(this);
-    
-    LOG_INFO("UI setup completed");
     
     m_recorder = new ScreenRecorder(this);
     
@@ -56,6 +59,10 @@ MainWindow::MainWindow(QWidget* parent)
 #else
     LOG_INFO("ScreenRecorder created (FFmpeg disabled)");
 #endif
+    
+    m_areaSelector = new AreaSelector(this);
+    connect(m_areaSelector, &AreaSelector::areaSelected, this, &MainWindow::onAreaSelected);
+    connect(m_areaSelector, &AreaSelector::selectionCancelled, this, &MainWindow::onAreaSelectionCancelled);
     
     initUI();
     initTrayIcon();
@@ -285,16 +292,51 @@ void MainWindow::onStopClicked()
 {
     LOG_INFO("Stop recording clicked");
 
-    m_recorder->stop();
     m_elapsedTimer->stop();
     hideFloatingIndicator();
     
 #ifdef ENABLE_FFMPEG
-    // 完成编码
-    if (m_encoder->isInitialized()) {
+    if (m_encoder && m_encoder->isInitialized()) {
+        LOG_INFO("Transferring frames from recorder to encoder...");
+        
+        QProgressDialog progressDlg("正在保存视频...", "请稍候", 0, 100, this);
+        progressDlg.setWindowModality(Qt::WindowModal);
+        progressDlg.setMinimumDuration(500);
+        progressDlg.setAutoClose(false);
+        progressDlg.setValue(0);
+        progressDlg.show();
+        QApplication::processEvents();
+        
+        int transferred = 0;
+        QSharedPointer<ScreenRecorder::Frame> frame;
+        while ((frame = m_recorder->getFrame()) != nullptr) {
+            m_encoder->addVideoFrame(frame->image, frame->timestamp);
+            transferred++;
+            
+            if (transferred % 100 == 0) {
+                progressDlg.setLabelText(QString("正在传输帧数据... (%1 帧)").arg(transferred));
+                progressDlg.setValue(qMin(transferred / 10, 99));
+                QApplication::processEvents();
+            }
+        }
+        LOG_INFO(QString("Transferred %1 frames to encoder").arg(transferred));
+        
+        progressDlg.setLabelText("正在编码视频文件...");
+        progressDlg.setValue(99);
+        QApplication::processEvents();
+        
+        LOG_INFO("Finishing encoding...");
         m_encoder->finish();
+        LOG_INFO("Encoding finished");
+        
+        progressDlg.setValue(100);
+        progressDlg.close();
     }
-    
+#endif
+
+    m_recorder->stop();
+
+#ifdef ENABLE_FFMPEG
     QMessageBox::information(this, "录制完成", 
                            QString("录制已完成！\n\n视频文件已保存至：\n%1").arg(m_currentFilePath));
 #else
@@ -321,16 +363,39 @@ void MainWindow::onAreaToggled(bool checked)
 
 void MainWindow::onSelectAreaClicked()
 {
-    // 简单的区域选择提示（实际应该实现区域选择窗口）
-    QMessageBox::information(this, "区域选择", 
-                           "区域选择功能将在后续版本中实现。\n当前将使用默认区域。");
+    LOG_INFO("Starting area selection...");
     
-    // 设置一个示例区域
     QScreen* screen = ScreenRecorder::getPrimaryScreen();
-    if (screen) {
-        QRect geom = screen->geometry();
-        m_selectedRect = QRect(geom.center().x() - 400, geom.center().y() - 300, 800, 600);
+    if (ui->screenCombo->currentIndex() >= 0 && ui->screenCombo->currentIndex() < QGuiApplication::screens().size()) {
+        screen = QGuiApplication::screens()[ui->screenCombo->currentIndex()];
     }
+    
+    m_areaSelector->showForScreen(screen);
+}
+
+void MainWindow::onAreaSelected(const QRect& rect)
+{
+    LOG_INFO(QString("Area selected: %1, %2, %3x%4")
+             .arg(rect.x()).arg(rect.y())
+             .arg(rect.width()).arg(rect.height()));
+    
+    m_selectedRect = rect;
+    
+    ui->screenLabel->setText(QString("已选区域:  (%1, %2) %3×%4")
+                             .arg(m_selectedRect.x())
+                             .arg(m_selectedRect.y())
+                             .arg(m_selectedRect.width())
+                             .arg(m_selectedRect.height()));
+    
+    applyConfigToRecorder();
+}
+
+void MainWindow::onAreaSelectionCancelled()
+{
+    LOG_INFO("Area selection cancelled");
+    
+    m_selectedRect = QRect();
+    ui->screenLabel->setText("未选择区域");
 }
 
 void MainWindow::onAudioToggled(bool checked)
@@ -545,38 +610,19 @@ void MainWindow::updateUI()
 void MainWindow::updateButtonStyles()
 {
     ScreenRecorder::RecordState state = m_recorder->state();
-    
-    // 清除所有样式
+
     ui->startBtn->setStyleSheet("");
     ui->pauseBtn->setStyleSheet("");
     ui->stopBtn->setStyleSheet("");
 
-    if (state == ScreenRecorder::Recording) {
+    if (state == ScreenRecorder::Paused) {
         ui->pauseBtn->setStyleSheet(
-            "QPushButton { background-color: #FFC107; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px; }"
-            "QPushButton:hover { background-color: #E0A800; }"
-        );
-        ui->stopBtn->setStyleSheet(
-            "QPushButton { background-color: #F44336; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px; }"
-            "QPushButton:hover { background-color: #D32F2F; }"
-        );
-    } else if (state == ScreenRecorder::Paused) {
-        ui->pauseBtn->setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px; }"
-            "QPushButton:hover { background-color: #45A049; }"
-        );
-        ui->stopBtn->setStyleSheet(
-            "QPushButton { background-color: #F44336; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px; }"
-            "QPushButton:hover { background-color: #D32F2F; }"
-        );
-    } else {
-        ui->startBtn->setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px; }"
-            "QPushButton:hover { background-color: #45A049; }"
+            "QPushButton { background-color: #67c23a; }"
+            "QPushButton:hover { background-color: #5daf34; }"
+            "QPushButton:pressed { background-color: #4fa02d; }"
         );
     }
 
-    // 更新暂停按钮文本
     ui->pauseBtn->setText(state == ScreenRecorder::Paused ? "继续" : "暂停");
 }
 

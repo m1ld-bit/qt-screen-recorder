@@ -83,28 +83,13 @@ bool ScreenRecorder::start()
         return false;
     }
 
-    // 创建采集线程
-    m_captureThread = new QThread(this);
-    
-    // 创建采集定时器（将移动到子线程）
-    m_captureTimer = new QTimer(nullptr);  // 注意：不能设置parent，否则无法moveToThread
+    m_captureTimer = new QTimer(this);
     m_captureTimer->setTimerType(Qt::PreciseTimer);
+    connect(m_captureTimer, &QTimer::timeout, this, &ScreenRecorder::onCaptureTick);
     
-    // 连接定时器信号槽
-    connect(m_captureTimer, &QTimer::timeout, this, &ScreenRecorder::onCaptureTick, Qt::DirectConnection);
-    
-    // 将定时器移动到子线程
-    m_captureTimer->moveToThread(m_captureThread);
-    
-    // 线程启动时启动定时器
-    connect(m_captureThread, &QThread::started, this, [this]() {
-        int interval = 1000 / m_config.frameRate;
-        m_captureTimer->start(interval);
-        LOG_INFO(QString("Capture timer started with interval: %1 ms").arg(interval));
-    });
-    
-    // 启动采集线程
-    m_captureThread->start();
+    int interval = 1000 / m_config.frameRate;
+    m_captureTimer->start(interval);
+    LOG_INFO(QString("Capture timer started with interval: %1 ms").arg(interval));
     
     // 记录开始时间
     m_startTime = QDateTime::currentMSecsSinceEpoch();
@@ -168,12 +153,6 @@ void ScreenRecorder::stop()
     // 停止采集定时器
     if (m_captureTimer) {
         m_captureTimer->stop();
-    }
-
-    // 停止采集线程
-    if (m_captureThread) {
-        m_captureThread->quit();
-        m_captureThread->wait();
     }
 
     // 清理资源
@@ -268,12 +247,6 @@ void ScreenRecorder::onCaptureTick()
     {
         QMutexLocker locker(&m_queueMutex);
         
-        // 如果队列已满，移除最早的帧
-        if (m_frameQueue.size() >= m_config.maxQueueSize) {
-            m_frameQueue.dequeue();
-            LOG_WARN("Frame queue full, dropping oldest frame");
-        }
-        
         m_frameQueue.enqueue(frame);
     }
 
@@ -358,12 +331,6 @@ void ScreenRecorder::cleanup()
     if (m_captureTimer) {
         m_captureTimer->deleteLater();
         m_captureTimer = nullptr;
-    }
-    
-    // 清理采集线程
-    if (m_captureThread) {
-        m_captureThread->deleteLater();
-        m_captureThread = nullptr;
     }
     
     // 清空帧队列

@@ -4,41 +4,51 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
 
+# Windows High DPI support
+win32 {
+    CONFIG += highdpi
+    DEFINES += QT_NO_DEPRECATED_WARNINGS
+}
+
 TARGET = ScreenRecorder
 TEMPLATE = app
 
-DEFINES += QT_DEPRECATED_WARNINGS
-
-# FFmpeg 配置 - 取消下面的注释以启用FFmpeg
-# 建议将FFmpeg放在项目目录下的ffmpeg文件夹中
-# ffmpeg/
-#   include/   (头文件)
-#   lib/       (库文件)
-#   bin/       (dll文件，运行时需要)
-
-# 启用FFmpeg支持（取消下面这行的注释）
-# DEFINES += ENABLE_FFMPEG
+# FFmpeg Configuration - ENABLED for MSVC
+DEFINES += ENABLE_FFMPEG
 
 contains(DEFINES, ENABLE_FFMPEG) {
     message(FFmpeg enabled)
     
-    # FFmpeg 头文件路径 - 根据你的实际路径修改
     FFMPEG_DIR = $$PWD/ffmpeg
     INCLUDEPATH += \
         include \
         $$FFMPEG_DIR/include
     
-    # FFmpeg 库文件 - 使用 -L 和 -l 方式
-    win32: LIBS += -L$$FFMPEG_DIR/lib \
-        -lavcodec \
-        -lavformat \
-        -lavutil \
-        -lswscale \
-        -lswresample \
-        -lavdevice
-    
-    # Windows特定定义
+    # FFmpeg libraries - auto-detect compiler (MSVC or MinGW)
     win32 {
+        contains(QMAKE_CXX, g\\+\\+)|contains(QMAKE_CXX, clang) {
+            # MinGW: use .dll.a files
+            LIBS += -L$$FFMPEG_DIR/lib \
+                -lavformat \
+                -lavcodec \
+                -lswresample \
+                -lswscale \
+                -lavutil
+            message(MinGW detected - using .dll.a libraries)
+        } else {
+            # MSVC: use .lib files with full paths
+            LIBS += \
+                $$FFMPEG_DIR/lib/avformat.lib \
+                $$FFMPEG_DIR/lib/avcodec.lib \
+                $$FFMPEG_DIR/lib/swresample.lib \
+                $$FFMPEG_DIR/lib/swscale.lib \
+                $$FFMPEG_DIR/lib/avutil.lib
+            message(MSV C detected - using .lib files)
+        }
+        
+        # Windows system libraries required by FFmpeg
+        LIBS += -lbcrypt -lOle32 -lUser32 -lMfplat -lStrmiids -lSecur32 -lShlwapi
+        
         DEFINES += _CRT_SECURE_NO_WARNINGS
         DEFINES += __STDC_CONSTANT_MACROS
     }
@@ -46,7 +56,7 @@ contains(DEFINES, ENABLE_FFMPEG) {
     SOURCES += src/FFmpegEncoder.cpp
     HEADERS += include/FFmpegEncoder.h
 } else {
-    message(FFmpeg disabled - recording only)
+    message(FFmpeg disabled - recording only, video will not be saved)
     INCLUDEPATH += include
 }
 
@@ -54,12 +64,14 @@ SOURCES += \
     src/main.cpp \
     src/MainWindow.cpp \
     src/ScreenRecorder.cpp \
-    src/Logger.cpp
+    src/Logger.cpp \
+    src/AreaSelector.cpp
 
 HEADERS += \
     include/MainWindow.h \
     include/ScreenRecorder.h \
-    include/Logger.h
+    include/Logger.h \
+    include/AreaSelector.h
 
 FORMS += \
     src/MainWindow.ui

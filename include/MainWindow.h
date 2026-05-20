@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QTimer>
 #include "ScreenRecorder.h"
+#include "AreaSelector.h"
 
 #ifdef ENABLE_FFMPEG
 #include "FFmpegEncoder.h"
@@ -41,6 +42,8 @@ private slots:
     void onFullScreenToggled(bool checked);
     void onAreaToggled(bool checked);
     void onSelectAreaClicked();
+    void onAreaSelected(const QRect& rect);
+    void onAreaSelectionCancelled();
     
     // 音频控制
     void onAudioToggled(bool checked);
@@ -104,6 +107,7 @@ private:
 
     Ui::MainWindow* ui;
     ScreenRecorder* m_recorder;
+    AreaSelector* m_areaSelector;
     
 #ifdef ENABLE_FFMPEG
     FFmpegEncoder* m_encoder;

@@ -6,95 +6,29 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>520</width>
-    <height>680</height>
+    <width>480</width>
+    <height>650</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>屏幕录制器</string>
   </property>
-  <property name="styleSheet">
-   <string notr="true">
-QMainWindow {
-    background-color: #f8f9fa;
-}
-QGroupBox {
-    font-weight: bold;
-    border: 2px solid #dee2e6;
-    border-radius: 8px;
-    margin-top: 12px;
-    padding-top: 10px;
-}
-QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 12px;
-    padding: 0 8px;
-    color: #495057;
-}
-QPushButton {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    min-height: 40px;
-}
-QPushButton:hover {
-    opacity: 0.9;
-}
-QPushButton:pressed {
-    opacity: 0.8;
-}
-QPushButton:disabled {
-    background-color: #adb5bd;
-    color: #6c757d;
-}
-QComboBox, QLineEdit {
-    padding: 8px 12px;
-    border: 2px solid #dee2e6;
-    border-radius: 6px;
-    background-color: white;
-    font-size: 13px;
-}
-QComboBox:hover, QLineEdit:hover {
-    border-color: #adb5bd;
-}
-QComboBox:focus, QLineEdit:focus {
-    border-color: #228be6;
-}
-QRadioButton, QCheckBox {
-    font-size: 13px;
-    spacing: 8px;
-}
-QProgressBar {
-    border: 2px solid #dee2e6;
-    border-radius: 6px;
-    text-align: center;
-    height: 20px;
-    background-color: #f1f3f5;
-}
-QProgressBar::chunk {
-    background-color: #40c057;
-    border-radius: 4px;
-}
-</string>
-  </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="mainLayout">
     <property name="spacing">
-     <number>12</number>
+     <number>10</number>
     </property>
     <property name="leftMargin">
-     <number>20</number>
+     <number>16</number>
     </property>
     <property name="topMargin">
-     <number>20</number>
+     <number>12</number>
     </property>
     <property name="rightMargin">
-     <number>20</number>
+     <number>16</number>
     </property>
     <property name="bottomMargin">
-     <number>20</number>
+     <number>10</number>
     </property>
     <item>
      <widget class="QGroupBox" name="recordModeGroup">
@@ -102,9 +36,6 @@ QProgressBar::chunk {
        <string>录制模式</string>
       </property>
       <layout class="QVBoxLayout" name="recordModeLayout">
-       <property name="spacing">
-        <number>10</number>
-       </property>
        <item>
         <widget class="QRadioButton" name="fullScreenRadio">
          <property name="text">
@@ -146,14 +77,7 @@ QProgressBar::chunk {
           </widget>
          </item>
          <item>
-          <widget class="QComboBox" name="screenCombo">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-          </widget>
+          <widget class="QComboBox" name="screenCombo"/>
          </item>
         </layout>
        </item>
@@ -166,9 +90,6 @@ QProgressBar::chunk {
        <string>录制设置</string>
       </property>
       <layout class="QVBoxLayout" name="settingsLayout">
-       <property name="spacing">
-        <number>10</number>
-       </property>
        <item>
         <layout class="QHBoxLayout" name="fpsLayout">
          <item>
@@ -179,14 +100,7 @@ QProgressBar::chunk {
           </widget>
          </item>
          <item>
-          <widget class="QComboBox" name="fpsCombo">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-          </widget>
+          <widget class="QComboBox" name="fpsCombo"/>
          </item>
         </layout>
        </item>
@@ -200,14 +114,7 @@ QProgressBar::chunk {
           </widget>
          </item>
          <item>
-          <widget class="QComboBox" name="qualityCombo">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-          </widget>
+          <widget class="QComboBox" name="qualityCombo"/>
          </item>
         </layout>
        </item>
@@ -222,12 +129,6 @@ QProgressBar::chunk {
          </item>
          <item>
           <widget class="QProgressBar" name="audioProgress">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
            <property name="maximum">
             <number>100</number>
            </property>
@@ -269,17 +170,8 @@ QProgressBar::chunk {
     </item>
     <item>
      <layout class="QHBoxLayout" name="controlLayout">
-      <property name="spacing">
-       <number>10</number>
-      </property>
       <item>
        <widget class="QPushButton" name="startBtn">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-          <horstretch>1</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
         <property name="text">
          <string>开始录制</string>
         </property>
@@ -287,12 +179,6 @@ QProgressBar::chunk {
       </item>
       <item>
        <widget class="QPushButton" name="pauseBtn">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-          <horstretch>1</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
         <property name="text">
          <string>暂停</string>
         </property>
@@ -303,12 +189,6 @@ QProgressBar::chunk {
       </item>
       <item>
        <widget class="QPushButton" name="stopBtn">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-          <horstretch>1</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
         <property name="text">
          <string>停止</string>
         </property>
@@ -384,13 +264,6 @@ QProgressBar::chunk {
        </item>
        <item>
         <widget class="QLabel" name="statusStateLabel">
-         <property name="font">
-          <font>
-           <pointsize>12</pointsize>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
          <property name="text">
           <string>空闲</string>
          </property>
@@ -421,13 +294,8 @@ QProgressBar::chunk {
     </item>
     <item>
      <widget class="QLabel" name="shortcutLabel">
-      <property name="font">
-       <font>
-        <pointsize>10</pointsize>
-       </font>
-      </property>
       <property name="styleSheet">
-       <string notr="true">color: #868e96;</string>
+       <string notr="true">color: #999999;</string>
       </property>
       <property name="text">
        <string>提示：按 Ctrl+Shift+R 可快速开始/停止录制</string>
